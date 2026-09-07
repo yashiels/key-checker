@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch
-from key_checker import load_keys, PROVIDERS
+from key_checker import load_keys, PROVIDERS, check_all
 
 
 def test_load_keys_from_env():
@@ -224,3 +224,15 @@ def test_build_parser_no_args():
     args = parser.parse_args([])
     assert args.anthropic is None
     assert args.json is False
+
+
+@pytest.mark.asyncio
+async def test_check_all_dispatches_all_providers():
+    async def fake_check(key):
+        return CheckResult(provider="fake", valid=True, status="Valid", detail=key)
+
+    with patch.dict("key_checker.CHECKERS", {"openai": fake_check, "gemini": fake_check}):
+        results = await check_all({"openai": "sk-test", "gemini": "AIza-test"})
+    assert len(results) == 2
+    assert all(r.valid for r in results)
+    assert {r.detail for r in results} == {"sk-test", "AIza-test"}
